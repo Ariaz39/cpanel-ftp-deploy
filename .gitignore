@@ -1,0 +1,16 @@
+# Credenciales y entorno local
+.deploy.env
+envs/
+
+# Estado de deploys locales
+.deploy-state/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
