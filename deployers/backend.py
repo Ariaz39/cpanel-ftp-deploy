@@ -123,7 +123,7 @@ def deploy_backend(args) -> None:
         for rel_path, abs_path, _ in tqdm(to_upload, desc="[backend] Subiendo", unit="arch"):
             remote_path = f"{remote_base}/{rel_path}"
             ftp.upload_file(abs_path, remote_path)
-            print(f"  {rel_path}  ✓")
+            print(f"  {rel_path}  OK")
 
     state_manager.save("backend", new_hashes)
     print("[backend] Estado actualizado")
@@ -141,6 +141,6 @@ def _call_webhook() -> None:
     print("[backend] Llamando webhook de migraciones...")
     try:
         resp = requests.post(url, headers={"X-Deploy-Token": token or ""}, timeout=30)
-        print(f"[backend] OK → {resp.text[:200]}")
+        print(f"[backend] OK - {resp.text[:200]}")
     except requests.RequestException as exc:
         print(f"[backend] ADVERTENCIA: webhook falló: {exc}", file=sys.stderr)

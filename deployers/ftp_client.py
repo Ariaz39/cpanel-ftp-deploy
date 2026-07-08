@@ -40,6 +40,14 @@ class FTPClient:
     def __exit__(self, *_):
         self.disconnect()
 
+    def _ping(self) -> None:
+        """Verifica que la sesión siga activa; reconecta silenciosamente si no."""
+        try:
+            self._ftp.voidcmd("NOOP")
+        except Exception:
+            self.disconnect()
+            self.connect()
+
     def _ensure_dir(self, remote_dir: str) -> None:
         if remote_dir in self._known_dirs:
             return
@@ -64,6 +72,7 @@ class FTPClient:
 
         for attempt in range(1, self.MAX_RETRIES + 1):
             try:
+                self._ping()
                 self._ensure_dir(remote_dir)
                 with open(local_path, "rb") as f:
                     self._ftp.storbinary(f"STOR {remote_path}", f)

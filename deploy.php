@@ -12,20 +12,11 @@
  *   Header: X-Deploy-Token: <tu_token_secreto>
  */
 
-define('DEPLOY_SECRET', getenv('DEPLOY_BACKEND_SECRET') ?: 'CAMBIA_ESTE_TOKEN');
 define('LOG_FILE', __DIR__ . '/storage/logs/deploy.log');
 
 header('Content-Type: application/json');
 
-// ── Validar token ─────────────────────────────────────────────────────────────
-$token = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '';
-if (!hash_equals(DEPLOY_SECRET, $token)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Token inválido', 'timestamp' => date('c')]);
-    exit;
-}
-
-// ── Bootear Laravel ───────────────────────────────────────────────────────────
+// ── Bootear Laravel primero para que Dotenv cargue el .env ───────────────────
 $autoload = __DIR__ . '/vendor/autoload.php';
 $bootstrap = __DIR__ . '/bootstrap/app.php';
 
@@ -39,6 +30,15 @@ require $autoload;
 $app = require $bootstrap;
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
+
+// ── Validar token (después del bootstrap para que env() lea el .env) ──────────
+$secret = env('DEPLOY_BACKEND_SECRET') ?: '';
+$token  = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '';
+if (!$secret || !hash_equals($secret, $token)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Token inválido', 'timestamp' => date('c')]);
+    exit;
+}
 
 // ── Ejecutar migraciones ──────────────────────────────────────────────────────
 try {

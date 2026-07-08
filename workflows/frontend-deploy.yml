@@ -1,0 +1,64 @@
+name: Deploy Frontend a cPanel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          path: frontend
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restaurar cache de estado deploy
+        uses: actions/cache@v4
+        with:
+          path: deploy-state
+          key: deploy-state-frontend-${{ github.ref_name }}
+          restore-keys: |
+            deploy-state-frontend-
+
+      - name: Checkout herramienta de deploy
+        uses: actions/checkout@v4
+        with:
+          repository: Ariaz39/cpanel-ftp-deploy
+          path: cpanel-ftp-deploy
+
+      - name: Instalar dependencias Python
+        run: pip install -r cpanel-ftp-deploy/requirements.txt
+
+      - name: Deploy frontend
+        working-directory: cpanel-ftp-deploy
+        env:
+          FRONTEND_PROJECT_PATH: ${{ github.workspace }}/frontend
+          STATE_CACHE_DIR: ${{ github.workspace }}/deploy-state
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_FRONTEND_REMOTE_DIR: ${{ secrets.FTP_FRONTEND_REMOTE_DIR }}
+        run: python deploy.py --target frontend
+
+      - name: Guardar cache de estado deploy
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: deploy-state
+          key: deploy-state-frontend-${{ github.ref_name }}-${{ github.run_id }}

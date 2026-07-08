@@ -1,0 +1,66 @@
+name: Deploy Backend a cPanel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          path: backend
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, pdo, pdo_mysql, tokenizer, xml, ctype, json, bcmath
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restaurar cache de estado deploy
+        uses: actions/cache@v4
+        with:
+          path: deploy-state
+          key: deploy-state-backend-${{ github.ref_name }}
+          restore-keys: |
+            deploy-state-backend-
+
+      - name: Checkout herramienta de deploy
+        uses: actions/checkout@v4
+        with:
+          repository: Ariaz39/cpanel-ftp-deploy
+          path: cpanel-ftp-deploy
+
+      - name: Instalar dependencias Python
+        run: pip install -r cpanel-ftp-deploy/requirements.txt
+
+      - name: Deploy backend
+        working-directory: cpanel-ftp-deploy
+        env:
+          BACKEND_PROJECT_PATH: ${{ github.workspace }}/backend
+          STATE_CACHE_DIR: ${{ github.workspace }}/deploy-state
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_BACKEND_REMOTE_DIR: ${{ secrets.FTP_BACKEND_REMOTE_DIR }}
+          DEPLOY_BACKEND_WEBHOOK_URL: ${{ secrets.DEPLOY_BACKEND_WEBHOOK_URL }}
+          DEPLOY_BACKEND_SECRET: ${{ secrets.DEPLOY_BACKEND_SECRET }}
+          BACKEND_ENV_PRODUCTION: ${{ secrets.BACKEND_ENV_PRODUCTION }}
+        run: python deploy.py --target backend
+
+      - name: Guardar cache de estado deploy
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: deploy-state
+          key: deploy-state-backend-${{ github.ref_name }}-${{ github.run_id }}

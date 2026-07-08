@@ -4,6 +4,7 @@ envs/
 
 # Estado de deploys locales
 .deploy-state/
+.test_state/
 
 # Python
 .venv/
