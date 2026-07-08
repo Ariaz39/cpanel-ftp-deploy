@@ -16,18 +16,31 @@ def _run(cmd: list[str], cwd: Path, label: str) -> None:
 
 
 def _find_dist(project_path: Path) -> Path:
-    """Localiza el directorio dist/ generado por ng build."""
-    dist_candidates = [
-        project_path / "dist",
-        *list((project_path / "dist").glob("*") if (project_path / "dist").exists() else []),
-    ]
-    dist_dir = project_path / "dist"
-    if not dist_dir.exists():
+    """Localiza el directorio browser/ generado por @angular/build:application (Angular 17+).
+
+    La estructura de salida es dist/<proyecto>/browser/.
+    Si no existe browser/, usa el primer subdirectorio de dist/ como fallback.
+    """
+    dist_root = project_path / "dist"
+    if not dist_root.exists():
         raise RuntimeError(
             f"[frontend] No se encontró dist/ en {project_path}. "
             "¿Se ejecutó ng build correctamente?"
         )
-    return dist_dir
+
+    browser_dirs = list(dist_root.glob("*/browser"))
+    if browser_dirs:
+        chosen = browser_dirs[0]
+        print(f"[frontend] Build dir: {chosen.relative_to(project_path)}")
+        return chosen
+
+    sub_dirs = [d for d in dist_root.iterdir() if d.is_dir()]
+    if sub_dirs:
+        chosen = sub_dirs[0]
+        print(f"[frontend] Build dir (fallback): {chosen.relative_to(project_path)}")
+        return chosen
+
+    return dist_root
 
 
 def _scan_dist(dist_dir: Path) -> dict[str, Path]:
