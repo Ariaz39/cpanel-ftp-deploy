@@ -12,13 +12,14 @@
  *   Header: X-Deploy-Token: <tu_token_secreto>
  */
 
-define('LOG_FILE', __DIR__ . '/storage/logs/deploy.log');
+define('LOG_FILE', dirname(__DIR__) . '/storage/logs/deploy.log');
 
 header('Content-Type: application/json');
 
 // ── Bootear Laravel primero para que Dotenv cargue el .env ───────────────────
-$autoload = __DIR__ . '/vendor/autoload.php';
-$bootstrap = __DIR__ . '/bootstrap/app.php';
+$root     = dirname(__DIR__);  // sube de public/ a la raíz del proyecto Laravel
+$autoload = $root . '/vendor/autoload.php';
+$bootstrap = $root . '/bootstrap/app.php';
 
 if (!file_exists($autoload) || !file_exists($bootstrap)) {
     http_response_code(500);
