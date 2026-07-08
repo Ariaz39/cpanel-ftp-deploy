@@ -28,10 +28,11 @@ class StateManager:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def save(self, target: str, files: dict[str, str]) -> None:
+    def save(self, target: str, files: dict[str, str], **extra) -> None:
         state = {
             "deployed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
             "files": files,
+            **extra,
         }
         with open(self._state_path(target), "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)

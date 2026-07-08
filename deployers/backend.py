@@ -69,20 +69,30 @@ def deploy_backend(args) -> None:
 
     _write_env(project_path)
 
+    state_manager = StateManager()
+    previous_state = state_manager.load("backend")
+
     if not args.skip_build:
-        _run(
-            ["composer", "install", "--no-dev", "--optimize-autoloader"],
-            project_path,
-            "composer install --no-dev",
-        )
+        composer_lock = project_path / "composer.lock"
+        current_composer_hash = state_manager.file_hash(composer_lock) if composer_lock.exists() else None
+        previous_composer_hash = previous_state.get("composer_lock_hash")
+
+        if current_composer_hash and current_composer_hash == previous_composer_hash:
+            print("[backend] composer.lock sin cambios — omitiendo composer install")
+        else:
+            _run(
+                ["composer", "install", "--no-dev", "--optimize-autoloader"],
+                project_path,
+                "composer install --no-dev",
+            )
+
         _run(["php", "artisan", "config:cache"], project_path, "php artisan config:cache")
         _run(["php", "artisan", "route:cache"], project_path, "php artisan route:cache")
         _run(["php", "artisan", "view:cache"], project_path, "php artisan view:cache")
     else:
         print("[backend] --skip-build: omitiendo compilación")
+        current_composer_hash = None
 
-    state_manager = StateManager()
-    previous_state = state_manager.load("backend")
     previous_files: dict[str, str] = previous_state.get("files", {})
     print(f"[backend] Estado anterior: {len(previous_files)} archivos conocidos")
 
@@ -110,7 +120,7 @@ def deploy_backend(args) -> None:
 
     if not to_upload:
         print("[backend] Nada que subir")
-        state_manager.save("backend", new_hashes)
+        state_manager.save("backend", new_hashes, composer_lock_hash=current_composer_hash)
         _call_webhook()
         return
 
