@@ -14,7 +14,6 @@ EXCLUDED = {
     ".github",
     ".claude",
     "tests",
-    ".env",
     ".env.example",
     "phpunit.xml",
     "README.md",
