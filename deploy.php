@@ -35,13 +35,7 @@ $secret = _readEnvValue($root . '/.env', 'DEPLOY_BACKEND_SECRET');
 $token  = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '';
 if (!$secret || !hash_equals($secret, $token)) {
     http_response_code(403);
-    echo json_encode([
-        'error'          => 'Token inválido',
-        'secret_len'     => strlen($secret),
-        'token_len'      => strlen($token),
-        'secret_preview' => substr($secret, 0, 6) . '...',
-        'timestamp'      => date('c'),
-    ]);
+    echo json_encode(['error' => 'Token inválido', 'timestamp' => date('c')]);
     exit;
 }
 
