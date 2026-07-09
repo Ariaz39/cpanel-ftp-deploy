@@ -16,11 +16,30 @@ define('LOG_FILE', dirname(__DIR__) . '/storage/logs/deploy.log');
 
 header('Content-Type: application/json');
 
-// ── Bootear Laravel primero para que Dotenv cargue el .env ───────────────────
-$root     = dirname(__DIR__);  // sube de public/ a la raíz del proyecto Laravel
-$autoload = $root . '/vendor/autoload.php';
+$root      = dirname(__DIR__);
+$autoload  = $root . '/vendor/autoload.php';
 $bootstrap = $root . '/bootstrap/app.php';
 
+// ── Validar token leyendo el .env directamente (env() falla con config cache) ─
+function _readEnvValue(string $file, string $key): string {
+    if (!file_exists($file)) return '';
+    foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if ($line === '' || $line[0] === '#') continue;
+        [$k, $v] = array_pad(explode('=', $line, 2), 2, '');
+        if (trim($k) === $key) return trim($v, "\"' \t");
+    }
+    return '';
+}
+
+$secret = _readEnvValue($root . '/.env', 'DEPLOY_BACKEND_SECRET');
+$token  = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '';
+if (!$secret || !hash_equals($secret, $token)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Token inválido', 'timestamp' => date('c')]);
+    exit;
+}
+
+// ── Bootear Laravel ───────────────────────────────────────────────────────────
 if (!file_exists($autoload) || !file_exists($bootstrap)) {
     http_response_code(500);
     echo json_encode(['error' => 'vendor/autoload.php o bootstrap/app.php no encontrado']);
@@ -28,18 +47,9 @@ if (!file_exists($autoload) || !file_exists($bootstrap)) {
 }
 
 require $autoload;
-$app = require $bootstrap;
+$app    = require $bootstrap;
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
-
-// ── Validar token (después del bootstrap para que env() lea el .env) ──────────
-$secret = env('DEPLOY_BACKEND_SECRET') ?: '';
-$token  = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '';
-if (!$secret || !hash_equals($secret, $token)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Token inválido', 'timestamp' => date('c')]);
-    exit;
-}
 
 // ── Ejecutar migraciones ──────────────────────────────────────────────────────
 try {
