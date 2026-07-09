@@ -18,6 +18,7 @@ EXCLUDED = {
     "phpunit.xml",
     "README.md",
     "node_modules",
+    "bootstrap/cache",
 }
 
 
@@ -85,9 +86,7 @@ def deploy_backend(args) -> None:
                 "composer install --no-dev",
             )
 
-        _run(["php", "artisan", "config:cache"], project_path, "php artisan config:cache")
-        _run(["php", "artisan", "route:cache"], project_path, "php artisan route:cache")
-        _run(["php", "artisan", "view:cache"], project_path, "php artisan view:cache")
+        print("[backend] Caches de Laravel generados en el servidor vía webhook")
     else:
         print("[backend] --skip-build: omitiendo compilación")
         current_composer_hash = None

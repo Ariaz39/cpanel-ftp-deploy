@@ -57,6 +57,16 @@ $app    = require $bootstrap;
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
+// ── Regenerar caches en el servidor (evita paths del runner en config cache) ──
+try {
+    Illuminate\Support\Facades\Artisan::call('config:clear');
+    Illuminate\Support\Facades\Artisan::call('config:cache');
+    Illuminate\Support\Facades\Artisan::call('route:cache');
+    Illuminate\Support\Facades\Artisan::call('view:cache');
+} catch (Throwable $e) {
+    // No es fatal — continúa con las migraciones
+}
+
 // ── Ejecutar migraciones ──────────────────────────────────────────────────────
 try {
     $exitCode = Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
