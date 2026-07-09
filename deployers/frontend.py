@@ -64,11 +64,7 @@ def deploy_frontend(args) -> None:
 
     if not args.skip_build:
         _run(["npm", "install"], project_path, "npm install")
-        _run(
-            ["npx", "ng", "build", "--configuration", "production"],
-            project_path,
-            "ng build --configuration production",
-        )
+        _run(["npm", "run", "build"], project_path, "npm run build")
     else:
         print("[frontend] --skip-build: omitiendo compilación")
 
