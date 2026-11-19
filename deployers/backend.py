@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -20,6 +21,12 @@ EXCLUDED = {
     "node_modules",
     "bootstrap/cache",
 }
+
+# Estado del deploy guardado en el servidor (no caduca como el Actions Cache).
+# Vive dentro del docroot porque el usuario FTP no tiene acceso fuera de él;
+# el .htaccess raíz reescribe todo a /public/, así que no se sirve por web.
+REMOTE_STATE_PATH = "storage/.deploy-state-backend.json"
+CHECKPOINT_EVERY = 100  # archivos subidos entre guardados parciales del estado
 
 
 def _run(cmd: list[str], cwd: Path, label: str) -> None:
@@ -70,7 +77,27 @@ def deploy_backend(args) -> None:
     _write_env(project_path)
 
     state_manager = StateManager()
-    previous_state = state_manager.load("backend")
+    cache_state = state_manager.load("backend")
+
+    ftp_host = os.environ.get("FTP_HOST")
+    ftp_user = os.environ.get("FTP_USER")
+    ftp_password = os.environ.get("FTP_PASSWORD")
+    remote_base = os.environ.get("FTP_BACKEND_REMOTE_DIR", "/public_html/api/").rstrip("/")
+    remote_state_path = f"{remote_base}/{REMOTE_STATE_PATH}"
+
+    remote_state = None
+    if ftp_host and ftp_user and ftp_password:
+        with FTPClient(ftp_host, ftp_user, ftp_password) as ftp:
+            remote_state = StateManager.parse_remote(ftp.download_bytes(remote_state_path))
+
+    previous_state = StateManager.newest(remote_state, cache_state)
+    if previous_state is None:
+        previous_state = {"deployed_at": None, "files": {}}
+        print("[backend] Sin estado previo — se subirá todo el proyecto")
+    elif previous_state is remote_state:
+        print("[backend] Estado cargado desde el servidor")
+    else:
+        print("[backend] Estado cargado desde Actions Cache (el servidor no tiene estado)")
 
     if not args.skip_build:
         composer_lock = project_path / "composer.lock"
@@ -118,23 +145,41 @@ def deploy_backend(args) -> None:
 
     if not to_upload:
         print("[backend] Nada que subir")
-        state_manager.save("backend", new_hashes, composer_lock_hash=current_composer_hash)
+        state = state_manager.save("backend", new_hashes, composer_lock_hash=current_composer_hash)
+        if remote_state is None and ftp_host and ftp_user and ftp_password:
+            # El servidor aún no tiene estado (p. ej. primer run tras caducar el cache)
+            with FTPClient(ftp_host, ftp_user, ftp_password) as ftp:
+                ftp.upload_bytes(json.dumps(state, indent=2).encode("utf-8"), remote_state_path)
+            print("[backend] Estado sincronizado en el servidor")
         _call_webhook()
         return
 
-    ftp_host = os.environ["FTP_HOST"]
-    ftp_user = os.environ["FTP_USER"]
-    ftp_password = os.environ["FTP_PASSWORD"]
-    remote_base = os.environ.get("FTP_BACKEND_REMOTE_DIR", "/public_html/api/").rstrip("/")
+    if not (ftp_host and ftp_user and ftp_password):
+        raise RuntimeError("FTP_HOST, FTP_USER y FTP_PASSWORD son obligatorias para subir archivos")
+
+    # Hashes confirmados en el servidor: arranca con lo anterior y se actualiza por cada
+    # archivo subido, así un corte a mitad de camino no obliga a re-subir todo.
+    confirmed: dict[str, str] = dict(previous_files)
+
+    def checkpoint(ftp: FTPClient) -> None:
+        state = state_manager.save("backend", confirmed, composer_lock_hash=current_composer_hash)
+        ftp.upload_bytes(json.dumps(state, indent=2).encode("utf-8"), remote_state_path)
 
     with FTPClient(ftp_host, ftp_user, ftp_password) as ftp:
-        for rel_path, abs_path, _ in tqdm(to_upload, desc="[backend] Subiendo", unit="arch"):
-            remote_path = f"{remote_base}/{rel_path}"
-            ftp.upload_file(abs_path, remote_path)
+        for i, (rel_path, abs_path, file_hash) in enumerate(
+            tqdm(to_upload, desc="[backend] Subiendo", unit="arch"), start=1
+        ):
+            ftp.upload_file(abs_path, f"{remote_base}/{rel_path}")
+            confirmed[rel_path] = file_hash
             print(f"  {rel_path}  OK")
+            if i % CHECKPOINT_EVERY == 0:
+                checkpoint(ftp)
 
-    state_manager.save("backend", new_hashes)
-    print("[backend] Estado actualizado")
+        # Estado final completo (descarta archivos que ya no existen en el build)
+        confirmed = new_hashes
+        checkpoint(ftp)
+
+    print("[backend] Estado actualizado (local y servidor)")
 
     _call_webhook()
 
