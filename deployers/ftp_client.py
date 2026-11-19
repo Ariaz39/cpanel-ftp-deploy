@@ -1,4 +1,5 @@
 import ftplib
+import io
 import os
 import time
 from pathlib import Path, PurePosixPath
@@ -88,3 +89,22 @@ class FTPClient:
                     self.connect()
                 except Exception:
                     pass
+
+    def download_bytes(self, remote_path: str) -> bytes | None:
+        """Descarga un archivo remoto; devuelve None si no existe."""
+        remote_path = remote_path.replace("\\", "/")
+        self._ping()
+        buffer = io.BytesIO()
+        try:
+            self._ftp.retrbinary(f"RETR {remote_path}", buffer.write)
+        except ftplib.error_perm:
+            return None
+        return buffer.getvalue()
+
+    def upload_bytes(self, data: bytes, remote_path: str) -> None:
+        """Sube contenido en memoria a una ruta remota (crea carpetas si faltan)."""
+        remote_path = remote_path.replace("\\", "/")
+        remote_dir = str(PurePosixPath(remote_path).parent)
+        self._ping()
+        self._ensure_dir(remote_dir)
+        self._ftp.storbinary(f"STOR {remote_path}", io.BytesIO(data))
