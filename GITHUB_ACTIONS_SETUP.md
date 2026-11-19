@@ -276,9 +276,20 @@ En la pestaña Actions, haz clic en el run fallido → botón **Re-run jobs** �
 - Si subiste `deploy.php` después de modificarlo, asegúrate de que la versión en el
   servidor es la más reciente
 
-### El cache de estado se corrompió (sube TODO en cada deploy)
-- Ve a Actions → **Caches** (en el sidebar) → elimina el cache `deploy-state-backend-main`
-- El próximo deploy hará un deploy completo (normal) y creará un cache limpio
+### El estado se corrompió (sube TODO en cada deploy)
+- **Backend:** el estado real está en el servidor. Borra por FTP/cPanel el archivo
+  `storage/.deploy-state-backend.json` **y** el cache `deploy-state-backend-main`
+  (Actions → **Caches**). Si borras solo uno, el otro se usa como respaldo.
+  Alternativa: lanza el deploy con `--force`.
+- **Frontend:** Actions → **Caches** → elimina `deploy-state-frontend-main`.
+- El próximo deploy hará un deploy completo (normal) y creará un estado limpio.
+
+### El deploy volvió a subir todo tras varios días sin movimientos
+- GitHub borra los caches sin uso durante 7 días.
+- **Backend:** ya no debería pasar; el estado se recupera de
+  `storage/.deploy-state-backend.json` en el servidor. Si ocurre, revisa que ese archivo
+  exista (el log muestra "Estado cargado desde el servidor").
+- **Frontend:** es esperable; el primer deploy tras caducar el cache sube todo.
 
 ### `BACKEND_ENV_PRODUCTION` no se aplica
 - Verifica que el secret esté definido en el repo del **backend** (no en el de deploy)
