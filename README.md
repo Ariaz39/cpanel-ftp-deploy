@@ -4,11 +4,19 @@ Herramienta Python para desplegar **Laravel (backend)** y **Angular (frontend)**
 a un servidor cPanel con solo acceso FTP.
 
 Sube únicamente los archivos que cambiaron comparando hashes MD5 con el deploy anterior.
-El estado del deploy vive en **GitHub Actions Cache** — esto garantiza que el cache
-siempre refleja exactamente lo que hay en el servidor y evita desincronizaciones.
+El estado del deploy (hashes MD5 de cada archivo) se guarda en dos sitios:
+
+- **Backend:** en el propio servidor, en `storage/.deploy-state-backend.json` dentro del
+  docroot (vía FTP). Es la fuente de verdad y no caduca. **GitHub Actions Cache** queda
+  como respaldo.
+- **Frontend:** solo en **GitHub Actions Cache**.
+
+> GitHub borra los caches sin uso durante 7 días. En el frontend, si pasa ese tiempo sin
+> deploys, el siguiente sube todo. El backend no se ve afectado: recupera el estado del
+> servidor.
 
 > Esta herramienta **solo se ejecuta desde GitHub Actions**. No está diseñada para
-> uso local: el estado persistido en Actions Cache es la fuente de verdad.
+> uso local.
 
 ## Cómo funciona
 
@@ -16,10 +24,11 @@ siempre refleja exactamente lo que hay en el servidor y evita desincronizaciones
 push a main en backend o frontend
   → GitHub Actions hace checkout del repo
   → Compila (composer install / ng build)
-  → Restaura deploy-state.json desde Actions Cache
+  → Carga el estado anterior (backend: servidor FTP; respaldo: Actions Cache)
   → Compara hashes MD5 de cada archivo vs. estado anterior
   → Sube SOLO los archivos que cambiaron vía FTP
-  → Guarda el nuevo deploy-state.json en Actions Cache
+  → (Backend) Guarda el estado cada 100 archivos, para reanudar si se corta
+  → Guarda el estado final en el servidor (backend) y en Actions Cache
   → (Backend) Llama al webhook para ejecutar migraciones
 ```
 
@@ -30,7 +39,7 @@ deployCpanelAutomate/
 ├── deploy.py                  # CLI principal (ejecutado por GitHub Actions)
 ├── deployers/
 │   ├── ftp_client.py          # Cliente FTP pasivo con reintentos
-│   ├── state_manager.py       # Gestión de deploy-state.json (solo Actions Cache)
+│   ├── state_manager.py       # Estado del deploy (cache local + helpers para el JSON del servidor)
 │   ├── backend.py             # Build y deploy Laravel
 │   └── frontend.py            # Build y deploy Angular
 ├── deploy.php                 # Webhook para migraciones (subir al servidor 1a vez)

@@ -24,8 +24,8 @@ def _check_environment() -> None:
     if os.getenv("GITHUB_ACTIONS") != "true":
         print(
             "[deploy] ERROR: Esta herramienta solo puede ejecutarse desde GitHub Actions.\n"
-            "         El estado del deploy vive en Actions Cache — ejecutarla localmente\n"
-            "         desincronizaría el estado con lo que hay en el servidor cPanel.",
+            "         El estado del deploy vive en el servidor / Actions Cache — ejecutarla\n"
+            "         localmente podría desincronizarlo con lo que hay en el servidor cPanel.",
             file=sys.stderr,
         )
         sys.exit(1)
